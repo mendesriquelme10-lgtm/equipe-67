@@ -1,0 +1,16 @@
+{
+  "name": "assistente-planilhas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicação de chat integrada à OpenAI e Google Sheets via Apps Script",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "openai": "^4.77.0"
+  }
+}
