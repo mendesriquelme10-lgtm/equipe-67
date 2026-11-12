@@ -32,7 +32,7 @@ function validate_(b){
  if(typeof b.idempotencyKey!=='string'||b.idempotencyKey.length<16||b.idempotencyKey.length>100)throw Error('INVALID_IDEMPOTENCY_KEY');
  if(!Array.isArray(b.scores)||b.scores.length!==4||b.scores.some(n=>!Number.isInteger(n)||n<1||n>5))throw Error('INVALID_SCORES');
 }
-function weighted_(s){return Math.round(s.reduce((a,n,i)=>a+n*CFG.WEIGHTS[i],0)*100)/100;}
+function isKnownProject_(id){const m=id.match(/^(EXT|NAC)-(\\d{3})$/);if(!m)return false;const n=Number(m[2]);return m[1]==='EXT'?n>=1&&n<=22:n>=1&&n<=24;}\nfunction weighted_(s){return Math.round(s.reduce((a,n,i)=>a+n*CFG.WEIGHTS[i],0)*100)/100;}
 function publicRanking_(){
  const id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');if(!id)throw Error('SERVER_NOT_CONFIGURED');
  const sh=SpreadsheetApp.openById(id).getSheetByName(CFG.VOTES_SHEET);if(!sh)throw Error('SHEETS_NOT_CONFIGURED');
