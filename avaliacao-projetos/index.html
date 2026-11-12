@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AvaliaProjetos</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#172033;--muted:#64748b;--primary:#3157d5;--line:#e5eaf2;--green:#16845b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,Arial,sans-serif}
+header{background:#14234a;color:white;padding:28px max(20px,calc((100% - 1100px)/2));}header small{opacity:.75;letter-spacing:.12em;text-transform:uppercase}h1{margin:5px 0;font-size:clamp(25px,4vw,36px)}header p{margin:0;color:#d5def7}
+main{max-width:1100px;margin:28px auto;padding:0 18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.tab,button{border:0;border-radius:10px;padding:11px 16px;font-weight:650;cursor:pointer}.tab{background:#e7ebf5;color:#34415d}.tab.active,button.primary{background:var(--primary);color:#fff}button.secondary{background:#e9edf7;color:#273654}button.danger{background:#fff0f0;color:#b42318}
+.panel{display:none}.panel.active{display:block}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:16px;box-shadow:0 5px 20px #1b2c5010}
+h2{margin:0 0 15px;font-size:21px}h3{margin:0 0 8px;font-size:17px}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}label{font-weight:650;font-size:13px}input,textarea,select{width:100%;border:1px solid #cfd7e5;border-radius:9px;padding:11px;font:inherit;background:#fff;color:var(--ink)}textarea{min-height:90px;resize:vertical}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.project{border:1px solid var(--line);padding:16px;border-radius:12px;margin:10px 0;display:flex;justify-content:space-between;gap:12px;align-items:center}.score{font-size:22px;font-weight:800;color:var(--green)}.criteria{display:grid;grid-template-columns:1fr 110px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.empty{text-align:center;padding:30px;color:var(--muted)}.pill{display:inline-block;background:#edf2ff;color:#3157d5;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:700}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.project{align-items:flex-start;flex-direction:column}.criteria{grid-template-columns:1fr 90px}.card{padding:17px}}
+</style></head>
+<body>
+<header><small>Plataforma de avaliação</small><h1>AvaliaProjetos</h1><p>Cadastre projetos, registre notas e acompanhe os resultados — sem login.</p></header>
+<main>
+<nav class="tabs"><button class="tab active" data-tab="projects">Projetos</button><button class="tab" data-tab="new">Novo projeto</button><button class="tab" data-tab="evaluate">Avaliar</button><button class="tab" data-tab="results">Resultados</button></nav>
+<section id="projects" class="panel active"><div class="card"><h2>Projetos cadastrados</h2><p class="muted">Selecione um projeto para avaliar ou consulte sua pontuação.</p><div id="projectList" class="empty">Carregando projetos...</div></div></section>
+<section id="new" class="panel"><div class="card"><h2>Cadastrar projeto</h2><form id="projectForm" class="grid"><div class="field"><label for="projectName">Nome do projeto *</label><input id="projectName" required maxlength="120"></div><div class="field"><label for="team">Responsável / equipe</label><input id="team" maxlength="120"></div><div class="field full"><label for="description">Descrição</label><textarea id="description" maxlength="1500"></textarea></div><div class="field full"><label for="contact">Contato (opcional)</label><input id="contact" maxlength="120"></div><div class="field full"><button class="primary" type="submit">Salvar projeto</button></div></form></div></section>
+<section id="evaluate" class="panel"><div class="card"><h2>Registrar avaliação</h2><form id="evaluationForm"><div class="field"><label for="projectSelect">Projeto *</label><select id="projectSelect" required><option value="">Selecione um projeto</option></select></div><div class="field" style="margin-top:14px"><label for="evaluator">Nome do avaliador (opcional)</label><input id="evaluator" maxlength="100" placeholder="Identificação do avaliador"></div><h3 style="margin-top:20px">Critérios de avaliação</h3><p class="muted">Dê uma nota de 0 a 10 para cada critério.</p><div id="criteriaList"></div><div class="field" style="margin-top:15px"><label for="comments">Observações</label><textarea id="comments" maxlength="1500"></textarea></div><div class="actions"><button class="primary" type="submit">Enviar avaliação</button></div></form></div></section>
+<section id="results" class="panel"><div class="card"><h2>Classificação dos projetos</h2><p class="muted">Média das avaliações registradas para cada projeto.</p><div id="resultsList" class="empty">Carregando resultados...</div></div></section>
+<footer class="muted" style="text-align:center;padding:10px 0 30px;font-size:12px">Acesso público sem login. Não informe dados pessoais sensíveis.</footer>
+</main>
+<script>
+const CRITERIA=["Relevância e impacto","Viabilidade de execução","Criatividade e inovação","Clareza dos objetivos","Resultados esperados"];
+let projects=[], evaluations=[];
+const $=id=>document.getElementById(id);
+function callServer(fn,...args){return new Promise((resolve,reject)=>{if(!window.google?.script?.run){reject(new Error("Abra o aplicativo pela URL publicada do Google Apps Script."));return}google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(new Error(e.message||"Falha na comunicação")))[fn](...args)})}
+function showError(e){alert(e.message||String(e))}
+function renderCriteria(){$("criteriaList").innerHTML=CRITERIA.map((c,i)=>'<div class="criteria"><label for="score'+i+'">'+c+'</label><input id="score'+i+'" type="number" min="0" max="10" step="0.5" value="0" required></div>').join("")}
+function refresh(){return callServer("getAppData").then(data=>{projects=data.projects||[];evaluations=data.evaluations||[];render()}).catch(e=>{showError(e);$("projectList").textContent="Não foi possível carregar os dados."})}
+function render(){
+$("projectList").innerHTML=projects.length?projects.map(p=>'<div class="project"><div><h3>'+esc(p.name)+'</h3><div class="muted">'+esc(p.team||"Responsável não informado")+'</div><span class="pill">'+(evaluations.filter(e=>e.projectId===p.id).length)+' avaliação(ões)</span></div><div class="actions"><button class="secondary" onclick="chooseProject(\''+p.id+'\')">Avaliar</button></div></div>').join(""):'<div class="empty">Nenhum projeto cadastrado ainda.</div>';
+$("projectSelect").innerHTML='<option value="">Selecione um projeto</option>'+projects.map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join("");
+const ranked=projects.map(p=>{const es=evaluations.filter(e=>e.projectId===p.id);const avg=es.length?es.reduce((s,e)=>s+Number(e.average),0)/es.length:null;return {...p,count:es.length,avg}}).sort((a,b)=>(b.avg??-1)-(a.avg??-1));
+$("resultsList").innerHTML=ranked.length?ranked.map((p,i)=>'<div class="project"><div><h3>#'+(i+1)+' '+esc(p.name)+'</h3><div class="muted">'+p.count+' avaliação(ões)</div></div><div class="score">'+(p.avg===null?"—":p.avg.toFixed(2)+"/10")+'</div></div>').join(""):'<div class="empty">Cadastre projetos para ver a classificação.</div>';
+}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function chooseProject(id){$("projectSelect").value=id;document.querySelector('[data-tab="evaluate"]').click()}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab,.panel").forEach(x=>x.classList.remove("active"));b.classList.add("active");$(b.dataset.tab).classList.add("active")}));
+$("projectForm").addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;try{await callServer("createProject",{name:$("projectName").value.trim(),team:$("team").value.trim(),description:$("description").value.trim(),contact:$("contact").value.trim()});e.target.reset();await refresh();document.querySelector('[data-tab="projects"]').click();alert("Projeto cadastrado!")}catch(err){showError(err)}finally{btn.disabled=false}});
+$("evaluationForm").addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;try{const scores=CRITERIA.map((name,i)=>({name,score:Number($("score"+i).value)}));await callServer("saveEvaluation",{projectId:$("projectSelect").value,evaluator:$("evaluator").value.trim(),comments:$("comments").value.trim(),scores});e.target.reset();renderCriteria();await refresh();document.querySelector('[data-tab="results"]').click();alert("Avaliação registrada!")}catch(err){showError(err)}finally{btn.disabled=false}});
+renderCriteria();refresh();
+</script></body></html>
