@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, BookOpen, CalendarDays, MapPin, Star, Info } from 'lucide-react';
+import { Search, Filter, BookOpen, CalendarDays, MapPin, Star, Info, Trophy, LockKeyhole } from 'lucide-react';
 import type { Catalog, Project, Modality } from './domain';
+import { weightedScore } from './domain';
 
 const modalities: Array<'Todas' | Modality> = ['Todas', 'Mostra Nacional', 'Mostra de Extensão'];
+const criteria = [
+  { label: 'Critério 1', weight: '30%' },
+  { label: 'Critério 2', weight: '30%' },
+  { label: 'Critério 3', weight: '25%' },
+  { label: 'Critério 4', weight: '15%' }
+];
 const normalize = (value: string) => value.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLocaleLowerCase('pt-BR');
 
 export default function App() {
@@ -13,6 +20,7 @@ export default function App() {
   const [area, setArea] = useState('Todas');
   const [day, setDay] = useState('Todas');
   const [selected, setSelected] = useState<Project | null>(null);
+  const [scores, setScores] = useState<Array<number | null>>([null, null, null, null]);
 
   useEffect(() => {
     fetch('./catalogo.json')
@@ -28,20 +36,22 @@ export default function App() {
 
   const areas = useMemo(() => ['Todas', ...Array.from(new Set(catalog?.projetos.map(p => p.area_tematica) ?? [])).sort((a,b) => a.localeCompare(b, 'pt-BR'))], [catalog]);
   const days = useMemo(() => ['Todas', ...Array.from(new Set(catalog?.projetos.map(p => p.data) ?? [])).sort()], [catalog]);
-
   const projects = useMemo(() => (catalog?.projetos ?? []).filter(p => {
     const searchable = normalize([p.id, p.titulo, p.area_tematica].join(' '));
-    return (modality === 'Todas' || p.modalidade === modality)
-      && (area === 'Todas' || p.area_tematica === area)
-      && (day === 'Todas' || p.data === day)
-      && searchable.includes(normalize(query));
+    return (modality === 'Todas' || p.modalidade === modality) && (area === 'Todas' || p.area_tematica === area) && (day === 'Todas' || p.data === day) && searchable.includes(normalize(query));
   }), [catalog, modality, area, day, query]);
-
   const counts = useMemo(() => ({
     all: catalog?.projetos.length ?? 0,
     national: catalog?.projetos.filter(p => p.modalidade === 'Mostra Nacional').length ?? 0,
     extension: catalog?.projetos.filter(p => p.modalidade === 'Mostra de Extensão').length ?? 0
   }), [catalog]);
+  const complete = scores.every((n): n is number => n !== null);
+  const preview = complete ? weightedScore(scores as number[]) : null;
+
+  function openProject(project: Project) {
+    setSelected(project);
+    setScores([null, null, null, null]);
+  }
 
   return <main>
     <header className="hero">
@@ -77,15 +87,27 @@ export default function App() {
           <div className="card-top"><span>{p.modalidade}</span><small>{p.id}</small></div>
           <p className="area">{p.area_tematica}</p><h3>{p.titulo}</h3>
           <div className="meta"><span><CalendarDays size={15}/>{new Date(p.data + 'T12:00:00').toLocaleDateString('pt-BR')} • {p.inicio}–{p.fim}</span><span><MapPin size={15}/>{p.local}</span></div>
-          <button className="details" onClick={() => setSelected(p)}>Ver detalhes <span>→</span></button>
+          <button className="details" onClick={() => openProject(p)}>Ver detalhes e avaliar <span>→</span></button>
         </article>)}
       </div>
       {catalog && projects.length === 0 && <p className="empty">Nenhum projeto corresponde aos filtros selecionados.</p>}
     </section>
 
-    <section className="how"><div><p className="eyebrow">AVALIAÇÃO POPULAR</p><h2>Sua opinião valoriza a pesquisa.</h2><p>O envio de avaliações será liberado após a configuração segura do serviço de votação e validação dos códigos de participação.</p></div><div className="how-icon"><Star size={34}/></div></section>
+    <section id="ranking" className="content ranking-section">
+      <div className="section-heading"><div><p className="eyebrow dark">RESULTADO DA PARTICIPAÇÃO</p><h2>Ranking popular</h2><p>As classificações serão separadas por modalidade.</p></div><span className="section-icon"><Trophy size={24}/></span></div>
+      <div className="ranking-grid">{(['Mostra Nacional', 'Mostra de Extensão'] as Modality[]).map(name => <article className="ranking-card" key={name}><h3>{name}</h3><div className="ranking-empty"><LockKeyhole size={22}/><b>Ranking ainda não disponível</b><span>Aguardando integração segura com a planilha.</span></div></article>)}</div>
+      <p className="ranking-rule">Projetos com menos de 5 avaliações válidas aparecerão como “Aguardando amostra mínima”. Nenhuma nota ou colocação é simulada.</p>
+    </section>
+
+    <section className="how"><div><p className="eyebrow">AVALIAÇÃO POPULAR</p><h2>Sua opinião valoriza a pesquisa.</h2><p>Você já pode conhecer os critérios e visualizar a nota ponderada. O envio ficará bloqueado até a configuração e os testes do serviço seguro de votação.</p></div><div className="how-icon"><Star size={34}/></div></section>
     <footer><b>UNIVERSO IF AVALIA</b><span>Protótipo acadêmico • Universo IF 2026</span><small>Esta avaliação é participativa e não substitui a avaliação oficial do evento.</small></footer>
 
-    {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setSelected(null)} aria-label="Fechar">×</button><span className="pill">{selected.modalidade} · {selected.id}</span><p className="area">{selected.area_tematica}</p><h2 id="modal-title">{selected.titulo}</h2><p><CalendarDays size={16}/> {new Date(selected.data + 'T12:00:00').toLocaleDateString('pt-BR')} • {selected.inicio} às {selected.fim}</p><p><MapPin size={16}/> {selected.local} · {selected.formato}</p><p className="source-note">Dados provenientes do catálogo do evento. A avaliação ficará disponível após a integração do backend.</p></section></div>}
+    {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setSelected(null)} aria-label="Fechar">×</button><span className="pill">{selected.modalidade} · {selected.id}</span><p className="area">{selected.area_tematica}</p><h2 id="modal-title">{selected.titulo}</h2><p><CalendarDays size={16}/> {new Date(selected.data + 'T12:00:00').toLocaleDateString('pt-BR')} • {selected.inicio} às {selected.fim}</p><p><MapPin size={16}/> {selected.local} · {selected.formato}</p>
+      <div className="evaluation"><h3><Star size={18}/> Prévia da avaliação</h3><p className="evaluation-help">Atribua uma nota de 1 a 5 em cada critério. A prévia não é enviada nem registrada.</p>
+        {criteria.map((criterion, i) => <label className="criterion" key={criterion.label}><span>{criterion.label} <small>({criterion.weight})</small></span><select aria-label={criterion.label} value={scores[i] ?? ''} onChange={e => setScores(old => old.map((v, index) => index === i ? (e.target.value ? Number(e.target.value) : null) : v))}><option value="">Selecione</option>{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} {n === 1 ? '— Insuficiente' : n === 5 ? '— Excelente' : ''}</option>)}</select></label>)}
+        <div className="score-preview"><span>Nota ponderada</span><strong>{preview === null ? '—' : preview.toFixed(2).replace('.', ',')}</strong><small>{complete ? 'Prévia calculada. Ainda não registrada.' : 'Preencha os quatro critérios para calcular.'}</small></div>
+        <button className="submit-disabled" disabled><LockKeyhole size={16}/> Envio indisponível nesta etapa</button>
+      </div>
+      <p className="source-note">O envio só será liberado após integração e homologação do backend. Esta prévia não gera voto.</p></section></div>}
   </main>;
 }
