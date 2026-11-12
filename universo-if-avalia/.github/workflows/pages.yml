@@ -1,0 +1,33 @@
+name: Build Universo IF Avalia
+on:
+  push:
+    branches: [feat/universo-if-avalia-mvp]
+    paths:
+      - 'universo-if-avalia/**'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'universo-if-avalia/**'
+      - '.github/workflows/pages.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: universo-if-avalia
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: universo-if-avalia/package-lock.json
+      - run: npm install
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: universo-if-avalia-dist
+          path: universo-if-avalia/dist
