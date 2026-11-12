@@ -28,7 +28,7 @@ function doPost(e){
 }
 function validate_(b){
  if(typeof b.token!=='string'||b.token.length<20||b.token.length>256)throw Error('INVALID_TOKEN_FORMAT');
- if(typeof b.projectId!=='string'||!/^(EXT|NAC)-\d{3}$/.test(b.projectId))throw Error('INVALID_PROJECT');
+ if(typeof b.projectId!=='string'||!isKnownProject_(b.projectId))throw Error('INVALID_PROJECT');
  if(typeof b.idempotencyKey!=='string'||b.idempotencyKey.length<16||b.idempotencyKey.length>100)throw Error('INVALID_IDEMPOTENCY_KEY');
  if(!Array.isArray(b.scores)||b.scores.length!==4||b.scores.some(n=>!Number.isInteger(n)||n<1||n>5))throw Error('INVALID_SCORES');
 }
