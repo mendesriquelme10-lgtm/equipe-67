@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, BookOpen, CalendarDays, MapPin, Star, Info, Trophy, LockKeyhole } from 'lucide-react';
 import type { Catalog, Project, Modality } from './domain';
 import { weightedScore } from './domain';
+import { loadPublicRanking, type PublicRankingItem } from './api';
 
 const modalities: Array<'Todas' | Modality> = ['Todas', 'Mostra Nacional', 'Mostra de Extensão'];
 const criteria = [
@@ -21,6 +22,9 @@ export default function App() {
   const [day, setDay] = useState('Todas');
   const [selected, setSelected] = useState<Project | null>(null);
   const [scores, setScores] = useState<Array<number | null>>([null, null, null, null]);
+  const [ranking, setRanking] = useState<PublicRankingItem[]>([]);
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [rankingError, setRankingError] = useState('');
 
   useEffect(() => {
     fetch('./catalogo.json')
@@ -32,6 +36,17 @@ export default function App() {
         setCatalog(data);
       })
       .catch(e => setError(e instanceof Error ? e.message : 'Falha ao carregar catálogo.'));
+  }, []);
+
+  useEffect(() => {
+    if (!apiUrl) return;
+    let active = true;
+    setRankingLoading(true);
+    loadPublicRanking(apiUrl)
+      .then(items => { if (active) { setRanking(items); setRankingError(''); } })
+      .catch(e => { if (active) setRankingError(e instanceof Error ? e.message : 'Falha ao carregar ranking.'); })
+      .finally(() => { if (active) setRankingLoading(false); });
+    return () => { active = false; };
   }, []);
 
   const areas = useMemo(() => ['Todas', ...Array.from(new Set(catalog?.projetos.map(p => p.area_tematica) ?? [])).sort((a,b) => a.localeCompare(b, 'pt-BR'))], [catalog]);
@@ -95,7 +110,20 @@ export default function App() {
 
     <section id="ranking" className="content ranking-section">
       <div className="section-heading"><div><p className="eyebrow dark">RESULTADO DA PARTICIPAÇÃO</p><h2>Ranking popular</h2><p>As classificações serão separadas por modalidade.</p></div><span className="section-icon"><Trophy size={24}/></span></div>
-      <div className="ranking-grid">{(['Mostra Nacional', 'Mostra de Extensão'] as Modality[]).map(name => <article className="ranking-card" key={name}><h3>{name}</h3><div className="ranking-empty"><LockKeyhole size={22}/><b>Ranking ainda não disponível</b><span>Aguardando integração segura com a planilha.</span></div></article>)}</div>
+      <div className="ranking-grid">{(['Mostra Nacional', 'Mostra de Extensão'] as Modality[]).map(name => {
+        const entries = (catalog?.projetos ?? []).filter(p => p.modalidade === name).map(project => ({
+          project, result: ranking.find(item => item.projectId === project.id)
+        })).sort((a, b) => (b.result?.average ?? -1) - (a.result?.average ?? -1) || (b.result?.votes ?? 0) - (a.result?.votes ?? 0) || a.project.titulo.localeCompare(b.project.titulo, 'pt-BR'));
+        return <article className="ranking-card" key={name}><h3>{name}</h3>
+          {!apiUrl ? <div className="ranking-empty"><LockKeyhole size={22}/><b>Ranking ainda não disponível</b><span>A URL do serviço ainda não foi configurada.</span></div>
+          : rankingLoading ? <div className="ranking-empty">Carregando resultados públicos…</div>
+          : rankingError ? <div className="ranking-empty"><b>Não foi possível carregar o ranking</b><span>{rankingError}</span></div>
+          : <ol className="ranking-list">{entries.map(({project, result}) => <li key={project.id}>
+              <div><b>{project.titulo}</b><small>{project.id} · {result?.votes ?? 0} avaliação(ões)</small></div>
+              <strong>{result?.status === 'ranked' && result.average !== null ? result.average.toFixed(2).replace('.', ',') : 'Aguardando amostra mínima'}</strong>
+            </li>)}</ol>}
+        </article>;
+      })}</div>
       <p className="ranking-rule">Projetos com menos de 5 avaliações válidas aparecerão como “Aguardando amostra mínima”. Nenhuma nota ou colocação é simulada.</p>
     </section>
 
