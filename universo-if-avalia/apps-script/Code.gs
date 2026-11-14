@@ -99,3 +99,20 @@ function publicRanking_(){
 function sha256_(v){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,v,Utilities.Charset.UTF_8).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function safeError_(m){return ['INVALID_ACTION','INVALID_TOKEN_FORMAT','INVALID_PROJECT','INVALID_IDEMPOTENCY_KEY','INVALID_SCORES','INVALID_TOKEN','ALREADY_EVALUATED','IDEMPOTENCY_CONFLICT','SERVER_NOT_CONFIGURED','SHEETS_NOT_CONFIGURED','INVALID_TOKENS_HEADERS'].includes(m)?m:'INTERNAL_ERROR';}
 function json_(v){return ContentService.createTextOutput(JSON.stringify(v)).setMimeType(ContentService.MimeType.JSON);}
+
+function testarConfiguracao(){
+ const props=PropertiesService.getScriptProperties();
+ const id=props.getProperty('SPREADSHEET_ID'),salt=props.getProperty('TOKEN_SALT');
+ if(!id||!salt)throw Error('Faltam propriedades do script.');
+ const ss=SpreadsheetApp.openById(id),tokens=ss.getSheetByName(CFG.TOKENS_SHEET),votes=ss.getSheetByName(CFG.VOTES_SHEET);
+ if(!tokens||!votes)throw Error('As abas Tokens e Votos não foram encontradas.');
+ const tokenHeaders=tokens.getRange(1,1,1,2).getValues()[0];
+ const voteHeaders=votes.getRange(1,1,1,10).getValues()[0];
+ const expectedTokens=['hash_codigo','ativo'];
+ const expectedVotes=['id_recibo','id_projeto','hash_codigo','c1','c2','c3','c4','nota_ponderada','criado_em','idempotency_key'];
+ if(expectedTokens.some((v,i)=>tokenHeaders[i]!==v)||expectedVotes.some((v,i)=>voteHeaders[i]!==v))throw Error('Os cabeçalhos das abas não correspondem ao padrão esperado.');
+ Logger.log('Conexão com a planilha OK!');
+ Logger.log('Aba Tokens encontrada: '+tokens.getName());
+ Logger.log('Aba Votos encontrada: '+votes.getName());
+ Logger.log('Cabeçalhos e propriedades conferidos; nenhum segredo foi exibido.');
+}
