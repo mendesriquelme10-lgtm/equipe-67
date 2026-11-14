@@ -31,7 +31,7 @@ export function loadPublicRanking(endpoint: string): Promise<PublicRankingItem[]
     };
     script.onerror = () => finish(new Error('Não foi possível acessar o serviço de ranking.'));
     const separator = endpoint.includes('?') ? '&' : '?';
-    script.src = endpoint + separator + 'callback=' + encodeURIComponent(callbackName);
+    script.src = endpoint + separator + 'callback=' + encodeURIComponent(callbackName) + '&_=' + Date.now();
     document.head.appendChild(script);
   });
 }
