@@ -14,13 +14,13 @@ Aplicação React + Vite + TypeScript para catálogo e avaliação popular dos p
 
 ## Configuração local do endpoint
 
-Criar um arquivo `.env.local` dentro desta pasta, sem adicioná-lo ao Git:
+Para testar localmente, copie `.env.example` para `.env.local` dentro desta pasta (sem adicioná-lo ao Git). O exemplo contém a URL da implantação privada já verificada por GET/JSONP; a implantação está restrita a **Somente eu**. Não publique essa configuração como acesso público e não considere o POST homologado até validar a resposta e o recibo no navegador:
 
 ```env
 VITE_API_URL=https://script.google.com/macros/s/SEU_DEPLOYMENT_ID/exec
 ```
 
-A URL acima é apenas o formato esperado. Não configurar até o Web App ser revisado, implantado e testado. Nunca colocar `TOKEN_SALT`, tokens ou hashes no frontend ou em variáveis `VITE_*`.
+O bloco acima ilustra o formato. Para o teste local, use o endereço que já está em `.env.example`. Não use `no-cors` para contornar bloqueios: sem recibo legível, o frontend não pode confirmar o voto. Nunca colocar `TOKEN_SALT`, tokens ou hashes no frontend ou em variáveis `VITE_*`.
 
 ## Desenvolvimento
 ```bash
