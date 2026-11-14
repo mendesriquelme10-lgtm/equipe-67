@@ -35,3 +35,32 @@ export function loadPublicRanking(endpoint: string): Promise<PublicRankingItem[]
     document.head.appendChild(script);
   });
 }
+
+
+export interface EvaluationPayload {
+  action: 'evaluate';
+  token: string;
+  projectId: string;
+  scores: number[];
+  idempotencyKey: string;
+}
+export interface EvaluationReceipt {
+  ok: boolean;
+  duplicate?: boolean;
+  receipt?: string;
+  error?: string;
+}
+
+export async function submitEvaluation(endpoint: string, payload: EvaluationPayload): Promise<EvaluationReceipt> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('O serviço respondeu com erro HTTP ' + response.status + '.');
+  const result = await response.json() as EvaluationReceipt;
+  if (!result || result.ok !== true || typeof result.receipt !== 'string' || !result.receipt) {
+    throw new Error(result?.error || 'O servidor não confirmou a avaliação.');
+  }
+  return result;
+}
