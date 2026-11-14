@@ -34,7 +34,7 @@ function generate(){
  btn.disabled=true;status.textContent='Gerando e salvando apenas os hashes…';
  document.getElementById('result').hidden=true;
  google.script.run.withSuccessHandler(tokens=>{
-  document.getElementById('tokens').value=tokens.join('\\n');
+  document.getElementById('tokens').value=tokens.join('\n');
   document.getElementById('result').hidden=false;
   status.textContent=tokens.length+' códigos gerados. Copie-os agora; eles não serão exibidos novamente.';
   btn.disabled=false;
