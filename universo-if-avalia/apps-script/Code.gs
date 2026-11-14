@@ -22,14 +22,18 @@ function gerarLoteTokens(quantidade){
  if(!sh)throw Error('SHEETS_NOT_CONFIGURED');
  const headers=sh.getRange(1,1,1,2).getValues()[0];
  if(headers[0]!=='hash_codigo'||headers[1]!=='ativo')throw Error('INVALID_TOKENS_HEADERS');
- const tokens=[],rows=[];
- for(let i=0;i<qtd;i++){
-  const token=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');
-  tokens.push(token);rows.push([sha256_(token+salt),true]);
- }
- sh.getRange(sh.getLastRow()+1,1,rows.length,2).setValues(rows);
- SpreadsheetApp.flush();
- return tokens;
+ const lock=LockService.getScriptLock();
+ lock.waitLock(15000);
+ try{
+  const tokens=[],rows=[];
+  for(let i=0;i<qtd;i++){
+   const token=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');
+   tokens.push(token);rows.push([sha256_(token+salt),true]);
+  }
+  sh.getRange(sh.getLastRow()+1,1,rows.length,2).setValues(rows);
+  SpreadsheetApp.flush();
+  return tokens;
+ }finally{if(lock.hasLock())lock.releaseLock();}
 }
 function doGet(e){
  try{
@@ -55,7 +59,14 @@ function doPost(e){
   const hash=sha256_(body.token+salt),tokenRows=tokens.getDataRange().getValues();
   if(!tokenRows.slice(1).some(r=>String(r[0])===hash&&r[1]===true))return json_({ok:false,error:'INVALID_TOKEN'});
   const rows=votes.getDataRange().getValues(),prior=rows.slice(1).find(r=>String(r[2])===hash&&String(r[1])===body.projectId);
-  if(prior){if(String(prior[9])===body.idempotencyKey)return json_({ok:true,duplicate:true,receipt:String(prior[0])});return json_({ok:false,error:'ALREADY_EVALUATED'});}
+  if(prior){
+   if(String(prior[9])===body.idempotencyKey){
+    const sameScores=body.scores.every((n,i)=>Number(prior[3+i])===n);
+    if(sameScores)return json_({ok:true,duplicate:true,receipt:String(prior[0])});
+    return json_({ok:false,error:'IDEMPOTENCY_CONFLICT'});
+   }
+   return json_({ok:false,error:'ALREADY_EVALUATED'});
+  }
   const score=weighted_(body.scores),receipt=Utilities.getUuid();
   votes.appendRow([receipt,body.projectId,hash,...body.scores,score,new Date(),body.idempotencyKey]);
   SpreadsheetApp.flush();
@@ -86,5 +97,5 @@ function publicRanking_(){
  return {ok:true,ranking:Object.values(groups).map(g=>({projectId:g.projectId,votes:g.votes,average:g.votes?Math.round(g.sum/g.votes*100)/100:null,criteriaAverage:g.votes?g.criteria.map(n=>Math.round(n/g.votes*100)/100):null,status:g.votes>=CFG.MIN_VOTES?'ranked':'pending'}))};
 }
 function sha256_(v){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,v,Utilities.Charset.UTF_8).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
-function safeError_(m){return ['INVALID_ACTION','INVALID_TOKEN_FORMAT','INVALID_PROJECT','INVALID_IDEMPOTENCY_KEY','INVALID_SCORES','INVALID_TOKEN','ALREADY_EVALUATED','SERVER_NOT_CONFIGURED','SHEETS_NOT_CONFIGURED','INVALID_TOKENS_HEADERS'].includes(m)?m:'INTERNAL_ERROR';}
+function safeError_(m){return ['INVALID_ACTION','INVALID_TOKEN_FORMAT','INVALID_PROJECT','INVALID_IDEMPOTENCY_KEY','INVALID_SCORES','INVALID_TOKEN','ALREADY_EVALUATED','IDEMPOTENCY_CONFLICT','SERVER_NOT_CONFIGURED','SHEETS_NOT_CONFIGURED','INVALID_TOKENS_HEADERS'].includes(m)?m:'INTERNAL_ERROR';}
 function json_(v){return ContentService.createTextOutput(JSON.stringify(v)).setMimeType(ContentService.MimeType.JSON);}
