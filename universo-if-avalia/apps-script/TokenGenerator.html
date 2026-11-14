@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{font:14px Arial,sans-serif;color:#202124;padding:18px}
+    p{line-height:1.45;color:#444}
+    label{display:block;font-weight:600;margin:18px 0 6px}
+    input{padding:9px;width:100%;box-sizing:border-box}
+    button{border:0;border-radius:6px;padding:10px 14px;margin:12px 8px 0 0;cursor:pointer;background:#174ea6;color:white}
+    button.secondary{background:#e8eaed;color:#202124}
+    textarea{width:100%;height:190px;box-sizing:border-box;padding:10px;font:12px monospace;margin-top:10px}
+    #status{min-height:20px;color:#174ea6}
+    .warning{background:#fff4e5;padding:10px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <p>Gere códigos individuais para a avaliação. A planilha recebe somente os hashes; os códigos originais aparecem abaixo uma única vez.</p>
+  <p class="warning"><b>Atenção:</b> copie e guarde os códigos em local seguro antes de fechar esta janela. Eles não poderão ser recuperados depois. Não compartilhe a lista publicamente.</p>
+  <label for="quantity">Quantidade de códigos (1 a 100)</label>
+  <input id="quantity" type="number" min="1" max="100" value="10">
+  <button id="generate" onclick="generate()">Gerar códigos</button>
+  <div id="status" role="status"></div>
+  <section id="result" hidden>
+    <label for="tokens">Códigos gerados — um por linha</label>
+    <textarea id="tokens" readonly></textarea>
+    <button class="secondary" onclick="copyTokens()">Copiar todos</button>
+  </section>
+<script>
+function generate(){
+ const btn=document.getElementById('generate'),status=document.getElementById('status');
+ const quantity=Number(document.getElementById('quantity').value);
+ if(!Number.isInteger(quantity)||quantity<1||quantity>100){status.textContent='Informe um número entre 1 e 100.';return;}
+ btn.disabled=true;status.textContent='Gerando e salvando apenas os hashes…';
+ document.getElementById('result').hidden=true;
+ google.script.run.withSuccessHandler(tokens=>{
+  document.getElementById('tokens').value=tokens.join('\\n');
+  document.getElementById('result').hidden=false;
+  status.textContent=tokens.length+' códigos gerados. Copie-os agora; eles não serão exibidos novamente.';
+  btn.disabled=false;
+ }).withFailureHandler(err=>{
+  status.textContent='Falha: '+(err&&err.message?err.message:'não foi possível gerar os códigos.');
+  btn.disabled=false;
+ }).gerarLoteTokens(quantity);
+}
+function copyTokens(){
+ const field=document.getElementById('tokens');field.select();field.setSelectionRange(0,field.value.length);
+ document.execCommand('copy');document.getElementById('status').textContent='Códigos copiados. Guarde a lista em local seguro.';
+}
+</script>
+</body>
+</html>
