@@ -12,6 +12,7 @@ const criteria = [
   { label: 'Critério 4', weight: '15%' }
 ];
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+const apiUrl = import.meta.env.VITE_API_URL?.trim() ?? '';
 
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
