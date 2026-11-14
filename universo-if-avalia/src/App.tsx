@@ -132,7 +132,12 @@ export default function App() {
       <div className="ranking-grid">{(['Mostra Nacional', 'Mostra de Extensão'] as Modality[]).map(name => {
         const entries = (catalog?.projetos ?? []).filter(p => p.modalidade === name).map(project => ({
           project, result: ranking.find(item => item.projectId === project.id)
-        })).sort((a, b) => (b.result?.average ?? -1) - (a.result?.average ?? -1) || (b.result?.votes ?? 0) - (a.result?.votes ?? 0) || a.project.titulo.localeCompare(b.project.titulo, 'pt-BR'));
+        })).sort((a, b) => {
+          const aRanked = a.result?.status === 'ranked', bRanked = b.result?.status === 'ranked';
+          if (aRanked !== bRanked) return aRanked ? -1 : 1;
+          if (aRanked && bRanked) return (b.result?.average ?? 0) - (a.result?.average ?? 0) || (b.result?.votes ?? 0) - (a.result?.votes ?? 0) || a.project.titulo.localeCompare(b.project.titulo, 'pt-BR');
+          return a.project.titulo.localeCompare(b.project.titulo, 'pt-BR');
+        });
         return <article className="ranking-card" key={name}><h3>{name}</h3>
           {!apiUrl ? <div className="ranking-empty"><LockKeyhole size={22}/><b>Ranking ainda não disponível</b><span>A URL do serviço ainda não foi configurada.</span></div>
           : rankingLoading ? <div className="ranking-empty">Carregando resultados públicos…</div>
