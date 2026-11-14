@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, BookOpen, CalendarDays, MapPin, Star, Info, Trophy, LockKeyhole } from 'lucide-react';
 import type { Catalog, Project, Modality } from './domain';
 import { weightedScore } from './domain';
-import { loadPublicRanking, type PublicRankingItem } from './api';
+import { loadPublicRanking, submitEvaluation, type PublicRankingItem } from './api';
 
 const modalities: Array<'Todas' | Modality> = ['Todas', 'Mostra Nacional', 'Mostra de Extensão'];
 const criteria = [
@@ -26,6 +26,10 @@ export default function App() {
   const [ranking, setRanking] = useState<PublicRankingItem[]>([]);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingError, setRankingError] = useState('');
+  const [token, setToken] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
+  const [idempotencyKey, setIdempotencyKey] = useState('');
 
   useEffect(() => {
     fetch('./catalogo.json')
@@ -67,6 +71,20 @@ export default function App() {
   function openProject(project: Project) {
     setSelected(project);
     setScores([null, null, null, null]);
+    setToken(''); setSubmitMessage(''); setIdempotencyKey('');
+  }
+
+  async function handleSubmit() {
+    if (!selected || !complete || !apiUrl || token.length < 20 || submitting) return;
+    const key = idempotencyKey || Array.from(window.crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+    setIdempotencyKey(key); setSubmitting(true); setSubmitMessage('Enviando avaliação e aguardando confirmação do servidor…');
+    try {
+      const result = await submitEvaluation(apiUrl, { action: 'evaluate', token, projectId: selected.id, scores: scores as number[], idempotencyKey: key });
+      setSubmitMessage('Avaliação confirmada. Recibo: ' + result.receipt);
+      setToken(''); setIdempotencyKey('');
+    } catch (e) {
+      setSubmitMessage((e instanceof Error ? e.message : 'Falha de comunicação.') + ' Nenhuma confirmação foi exibida. Se houve falha de rede, tente novamente sem alterar as notas para reutilizar a mesma tentativa.');
+    } finally { setSubmitting(false); }
   }
 
   return <main>
@@ -132,10 +150,13 @@ export default function App() {
     <footer><b>UNIVERSO IF AVALIA</b><span>Protótipo acadêmico • Universo IF 2026</span><small>Esta avaliação é participativa e não substitui a avaliação oficial do evento.</small></footer>
 
     {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setSelected(null)} aria-label="Fechar">×</button><span className="pill">{selected.modalidade} · {selected.id}</span><p className="area">{selected.area_tematica}</p><h2 id="modal-title">{selected.titulo}</h2><p><CalendarDays size={16}/> {new Date(selected.data + 'T12:00:00').toLocaleDateString('pt-BR')} • {selected.inicio} às {selected.fim}</p><p><MapPin size={16}/> {selected.local} · {selected.formato}</p>
-      <div className="evaluation"><h3><Star size={18}/> Prévia da avaliação</h3><p className="evaluation-help">Atribua uma nota de 1 a 5 em cada critério. A prévia não é enviada nem registrada.</p>
-        {criteria.map((criterion, i) => <label className="criterion" key={criterion.label}><span>{criterion.label} <small>({criterion.weight})</small></span><select aria-label={criterion.label} value={scores[i] ?? ''} onChange={e => setScores(old => old.map((v, index) => index === i ? (e.target.value ? Number(e.target.value) : null) : v))}><option value="">Selecione</option>{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} {n === 1 ? '— Insuficiente' : n === 5 ? '— Excelente' : ''}</option>)}</select></label>)}
-        <div className="score-preview"><span>Nota ponderada</span><strong>{preview === null ? '—' : preview.toFixed(2).replace('.', ',')}</strong><small>{complete ? 'Prévia calculada. Ainda não registrada.' : 'Preencha os quatro critérios para calcular.'}</small></div>
-        <button className="submit-disabled" disabled><LockKeyhole size={16}/> Envio indisponível nesta etapa</button>
+      <div className="evaluation"><h3><Star size={18}/> Prévia da avaliação</h3><p className="evaluation-help">Atribua uma nota de 1 a 5 em cada critério. A nota ponderada é calculada automaticamente.</p>
+        {criteria.map((criterion, i) => <label className="criterion" key={criterion.label}><span>{criterion.label} <small>({criterion.weight})</small></span><select disabled={submitting} aria-label={criterion.label} value={scores[i] ?? ''} onChange={e => { setScores(old => old.map((v, index) => index === i ? (e.target.value ? Number(e.target.value) : null) : v)); setIdempotencyKey(''); setSubmitMessage(''); }}><option value="">Selecione</option>{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} {n === 1 ? '— Insuficiente' : n === 5 ? '— Excelente' : ''}</option>)}</select></label>)}
+        <div className="score-preview"><span>Nota ponderada</span><strong>{preview === null ? '—' : preview.toFixed(2).replace('.', ',')}</strong><small>{complete ? 'Confira suas notas antes de enviar.' : 'Preencha os quatro critérios para calcular.'}</small></div>
+        <label className="token-field"><span>Código de avaliação</span><input type="password" autoComplete="off" value={token} disabled={submitting} onChange={e => setToken(e.target.value.trim())} placeholder="Digite seu código individual" /></label>
+        <button className={apiUrl && complete && token.length >= 20 && !submitting ? 'submit-enabled' : 'submit-disabled'} disabled={!apiUrl || !complete || token.length < 20 || submitting} onClick={handleSubmit}><LockKeyhole size={16}/>{submitting ? 'Enviando…' : 'Enviar avaliação'}</button>
+        {submitMessage && <p className="submit-message" role="status">{submitMessage}</p>}
+        {!apiUrl && <p className="evaluation-help">Envio bloqueado até configurar e homologar o endereço do Apps Script.</p>}
       </div>
       <p className="source-note">O envio só será liberado após integração e homologação do backend. Esta prévia não gera voto.</p></section></div>}
   </main>;
